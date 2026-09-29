@@ -18,50 +18,30 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
+          flutter-version: '3.24.5'
           channel: 'stable'
           cache: true
 
       - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '11076708'
+
+      - name: Accept Android SDK licenses
         run: |
-          set -x
-          export ANDROID_HOME=$HOME/android-sdk
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
-          mkdir -p $ANDROID_HOME
+          yes | sdkmanager --licenses 2>&1 | tail -5
 
-          # Verify Java
-          java -version 2>&1 || { echo "JAVA NOT FOUND"; exit 1; }
+      - name: Install SDK components
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-          # Download command-line tools
-          cd /tmp
-          curl -fL -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip || { echo "DOWNLOAD FAILED"; exit 1; }
-          unzip -q cmdline-tools.zip || { echo "UNZIP FAILED"; exit 1; }
-          ls -la /tmp/cmdline-tools/ || { echo "NO CMDLINE-TOOLS DIR"; exit 1; }
-
-          # Restructure: we need cmdline-tools/latest/
-          rm -rf $ANDROID_HOME/cmdline-tools
-          mv /tmp/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
-          ls -la $ANDROID_HOME/cmdline-tools/latest/ || { echo "NO LATEST DIR"; exit 1; }
-
-          # Add to PATH
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-
-          # Accept licenses
-          mkdir -p $ANDROID_HOME/licenses
-          echo "24333f8a63b6825ea9c050efe1c0c3b5741c9266" > $ANDROID_HOME/licenses/android-sdk-license
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-
-          # Install platform + build tools (this is what takes time)
-          echo "=== Installing SDK components ==="
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" --verbose || { echo "SDKMANAGER FAILED"; exit 1; }
-
-          echo "=== SDK setup complete ==="
-          ls $ANDROID_HOME/platforms/
-          ls $ANDROID_HOME/build-tools/
-
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+      - name: Show SDK info
+        run: |
+          echo "ANDROID_HOME: $ANDROID_HOME"
+          echo "=== Platforms ==="
+          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "none"
+          echo "=== Build Tools ==="
+          ls $ANDROID_HOME/build-tools/ 2>/dev/null || echo "none"
 
       - name: Get dependencies
         run: flutter pub get
