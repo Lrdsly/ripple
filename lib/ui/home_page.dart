@@ -100,9 +100,12 @@ class _Hero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(colors: [cs.primary, cs.tertiary.withOpacity(.85)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          colors: [cs.primary, cs.tertiary.withValues(alpha: .85)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Required for $month', style: const TextStyle(color: Colors.white70)),

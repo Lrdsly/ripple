@@ -29,7 +29,7 @@ class WeeklyChart extends StatelessWidget {
                     tween: Tween(begin: 0, end: max == 0 ? 0 : d.total / max),
                     duration: const Duration(milliseconds: 650),
                     curve: Curves.easeOutCubic,
-                    builder: (_, v, __) => Container(
+                    builder: (context, v, child) => Container(
                       width: 22,
                       height: 6 + (barArea - 6) * v,
                       decoration: BoxDecoration(
@@ -39,7 +39,7 @@ class WeeklyChart extends StatelessWidget {
                           end: Alignment.topCenter,
                           colors: d.date == today
                               ? [cs.primary, cs.tertiary]
-                              : [cs.primary.withOpacity(.35), cs.primary.withOpacity(.75)],
+                              : [cs.primary.withValues(alpha: .35), cs.primary.withValues(alpha: .75)],
                         ),
                       ),
                     ),

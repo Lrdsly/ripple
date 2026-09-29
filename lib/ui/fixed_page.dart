@@ -27,7 +27,7 @@ class FixedPage extends StatelessWidget {
                 Dismissible(
                   key: ValueKey(f.id),
                   onDismissed: (_) => s.removeFixed(f.id),
-                  background: Container(color: Colors.red.withOpacity(.4)),
+                  background: Container(color: Colors.red.withValues(alpha: .4)),
                   child: Card(
                     child: ListTile(
                       title: Text(f.name),
