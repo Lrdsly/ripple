@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,38 +16,70 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.5'
-          channel: 'stable'
-          cache: true
+      - name: Diagnose environment
+        run: |
+          set -x
+          echo "=== Java ==="
+          java -version 2>&1
+          echo "=== Android SDK paths to check ==="
+          for p in /usr/local/lib/android/sdk $HOME/android-sdk $HOME/.android/sdk /opt/android-sdk /usr/share/android-sdk; do
+            echo "Checking: $p"
+            if [ -d "$p" ]; then
+              echo "  EXISTS"
+              ls -la "$p/" | head -20
+            else
+              echo "  NOT FOUND"
+            fi
+          done
+          echo "=== PATH ==="
+          echo $PATH
+          echo "=== Environment ==="
+          env | grep -i android || echo "No ANDROID env vars"
+          echo "=== Flutter (if pre-installed) ==="
+          which flutter 2>/dev/null || echo "flutter not in PATH"
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK (try android-actions)
+        id: setup-android
+        continue-on-error: true
         uses: android-actions/setup-android@v4
-        with:
-          cmdline-tools-version: '11076708'
 
-      - name: Accept Android SDK licenses
+      - name: Check if setup-android succeeded
         run: |
-          yes | sdkmanager --licenses 2>&1 | tail -5
+          if [ "${{ steps.setup-android.outcome }}" = "success" ]; then
+            echo "✅ setup-android succeeded"
+            echo "ANDROID_HOME: $ANDROID_HOME"
+            ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "no platforms"
+            ls $ANDROID_HOME/build-tools/ 2>/dev/null || echo "no build-tools"
+          else
+            echo "❌ setup-android failed, will try manual install"
+          fi
 
-      - name: Install SDK components
+      - name: Manual Android SDK install (fallback)
+        if: steps.setup-android.outcome != 'success'
         run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Show SDK info
-        run: |
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          echo "=== Platforms ==="
-          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "none"
-          echo "=== Build Tools ==="
-          ls $ANDROID_HOME/build-tools/ 2>/dev/null || echo "none"
+          set -x
+          export ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME
+          cd /tmp
+          curl -fL -o cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdline.zip
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          mv /tmp/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          echo "24333f8a63b6825ea9c050efe1c0c3b5741c9266" > $ANDROID_HOME/licenses/android-sdk-license
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" --verbose
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
 
       - name: Get dependencies
-        run: flutter pub get
+        run: |
+          export ANDROID_HOME=${{ env.ANDROID_HOME }}
+          flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          export ANDROID_HOME=${{ env.ANDROID_HOME }}
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
