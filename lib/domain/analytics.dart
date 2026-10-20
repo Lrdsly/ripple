@@ -1,4 +1,5 @@
 import '../core/theme.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 import '../data/models.dart';
 
 class DayTotal {
@@ -36,6 +37,45 @@ class Analytics {
         return DayTotal(d, _sum(d, d));
       });
 
+  /// All payments on one calendar day (date part only).
+  List<Payment> dayPayments(DateTime day) {
+    final d = dateOnly(day);
+    return payments.where((p) => dateOnly(p.date) == d).toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+  }
+
+  /// Payments on [day] that look like double entries: same amount plus
+  /// same tag (or same title when untagged), written more than once.
+  /// Only groups of 2+ are returned. Data is still fully counted —
+  /// callers should warn, not drop.
+  List<List<Payment>> duplicateGroups(DateTime day) {
+    final groups = <String, List<Payment>>{};
+    for (final p in dayPayments(day)) {
+      final key = p.allTags.isEmpty
+          ? '${p.amount}|${p.title}'
+          : '${p.amount}|#${p.allTags.first}';
+      (groups[key] ??= []).add(p);
+    }
+    return groups.values.where((g) => g.length > 1).toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+  }
+
+  /// Tag -> total for one day. Untagged payments go under ''.
+  Map<String, double> dayTagTotals(DateTime day) {
+    final totals = <String, double>{};
+    for (final p in dayPayments(day)) {
+      final tags = p.allTags;
+      if (tags.isEmpty) {
+        totals[''] = (totals[''] ?? 0) + p.amount;
+      } else {
+        for (final t in tags) {
+          totals[t] = (totals[t] ?? 0) + p.amount;
+        }
+      }
+    }
+    return totals;
+  }
+
   /// Average spend per calendar day over the last [window] days
   /// (shorter if your history is shorter).
   double avgDaily({int window = 90, DateTime? now}) {
@@ -51,12 +91,32 @@ class Analytics {
 
   Forecast forecast(int year, int month, List<FixedExpense> fixed) {
     final days = DateTime(year, month + 1, 0).day;
+    return forecastRange(
+        DateTime(year, month, 1), DateTime(year, month, days), fixed);
+  }
+
+  /// Solar-month forecast: [jy]/[jm] is a Jalali month (e.g. Mehr 1405).
+  /// Month length and spent-so-far follow the solar calendar, so a month
+  /// of daily notes is never split across two Gregorian months.
+  Forecast forecastJalali(int jy, int jm, List<FixedExpense> fixed) {
+    final days = Jalali(jy, jm).monthLength;
+    final gs = Jalali(jy, jm, 1).toGregorian();
+    final ge = Jalali(jy, jm, days).toGregorian();
+    return forecastRange(
+        DateTime(gs.year, gs.month, gs.day),
+        DateTime(ge.year, ge.month, ge.day),
+        fixed);
+  }
+
+  Forecast forecastRange(
+      DateTime from, DateTime to, List<FixedExpense> fixed) {
+    final days = dateOnly(to).difference(dateOnly(from)).inDays + 1;
     final avg = avgDaily();
     return Forecast(
       avg,
       avg * days,
-      fixed.fold(0.0, (s, f) => s + f.monthlyCost(year, month)),
-      _sum(DateTime(year, month, 1), DateTime(year, month, days)),
+      fixed.fold(0.0, (s, f) => s + f.costForRange(from, to)),
+      _sum(dateOnly(from), dateOnly(to)),
       days,
     );
   }

@@ -19,16 +19,23 @@ flutter run -d android      # phone (after Android SDK setup)
 **Demo mode** (default): random fake payments — works immediately.
 
 **Your notes**: tap the folder icon in the app bar and pick your Obsidian vault.
-Daily notes must be named `YYYY-MM-DD.md`. Payment lines:
+Filenames: `2026-09-29.md` (Gregorian) or `1404-07-05.md` (Jalali, auto-converted;
+short `405-07-02` also works). Files with no date use their modification date —
+no `.md` file is ever skipped. Payment lines (bullet optional):
 
 ```
 - 45000 Lunch #food
-- 120000 Rent #fixed
-* 35000 Taxi
-- [ ] 50000 Groceries
+20 رفت و برگشت خوابگاه
+276 نودل #غذا
+475/5 تخم مرغ
 ```
 
-The app reads recursively, parsing any `.md` file with a date in the filename.
+Separators (`___`) and bare totals (`550`) are ignored.
+
+**Managing notes**: tap the minus badge on any payment card to remove
+that line from its `.md` file (with confirm + undo). Removals are
+recorded in the hidden `.ripple_removed.json` log in the vault root
+(date, title, amount, tags, removal time) so they can be restored later.
 
 ## Architecture
 

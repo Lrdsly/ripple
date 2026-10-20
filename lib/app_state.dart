@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/models.dart';
 import 'data/sources/demo_source.dart';
@@ -14,6 +14,10 @@ class AppState extends ChangeNotifier {
   int weekOffset = 0;
   bool loading = true;
   String? error;
+  ThemeMode themeMode = ThemeMode.system;
+  /// 'system' | 'sand' | 'ice' | 'night'. 'sand'/'ice' are light
+  /// variants, 'night' is dark.
+  String themeChoice = 'system';
   late SharedPreferences _p;
 
   Analytics get analytics => Analytics(payments);
@@ -23,6 +27,17 @@ class AppState extends ChangeNotifier {
   Future<void> init() async {
     _p = await SharedPreferences.getInstance();
     folder = _p.getString('folder');
+    themeChoice = _p.getString('themeChoice') ??
+        switch (_p.getString('themeMode')) {
+          'light' => 'sand',
+          'dark' => 'night',
+          _ => 'system',
+        };
+    themeMode = switch (themeChoice) {
+      'sand' || 'ice' => ThemeMode.light,
+      'night' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
     fixed = (_p.getStringList('fixed') ?? [])
         .map((s) => FixedExpense.fromJson(jsonDecode(s)))
         .toList();
@@ -54,6 +69,23 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setThemeChoice(String choice) async {
+    themeChoice = choice;
+    themeMode = switch (choice) {
+      'sand' || 'ice' => ThemeMode.light,
+      'night' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+    await _p.setString('themeChoice', choice);
+    notifyListeners();
+  }
+
+  Future<void> toggleTheme() async {
+    await setThemeChoice(
+      themeChoice == 'night' ? 'sand' : 'night',
+    );
+  }
+
   Future<void> _saveFixed() async {
     await _p.setStringList('fixed', fixed.map((f) => jsonEncode(f.toJson())).toList());
     notifyListeners();
@@ -61,6 +93,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> addFixed(FixedExpense f) async {
     fixed = [...fixed, f];
+    await _saveFixed();
+  }
+
+  Future<void> updateFixed(FixedExpense f) async {
+    fixed = fixed.map((e) => e.id == f.id ? f : e).toList();
     await _saveFixed();
   }
 
